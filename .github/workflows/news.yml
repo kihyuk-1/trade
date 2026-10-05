@@ -1,0 +1,38 @@
+name: 주식 뉴스 알리미
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # 5분마다 (GitHub 사정에 따라 늦어지거나 건너뛸 수 있음)
+  workflow_dispatch:         # Actions 탭에서 "Run workflow" 버튼으로 바로 실행
+
+permissions:
+  contents: write            # 읽은 기사 기록(seen_news.json)을 저장소에 저장하기 위해
+
+concurrency:
+  group: news-bot            # 겹쳐서 실행되지 않게
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python bot.py --once
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: 읽은 기사 기록 저장
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seen_news.json
+          git diff --cached --quiet || (git commit -m "읽은 기사 기록 갱신" && git push)
